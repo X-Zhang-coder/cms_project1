@@ -1,0 +1,38 @@
+# --------------- INITIALIZATION ------------------
+clear
+units 		metal
+dimension	3
+boundary	p	p    p
+atom_style	atomic
+
+# ------------------ ATOM DEFINITION -------------------
+variable i loop 20
+variable    len equal 2.855+0.001*${i}
+
+lattice     bcc ${len}
+# orient x 1 0 0 orient y 0 1 0 orient z 0 0 1
+region		simbox block -4 4 -4 4 -4 4
+create_box	1 simbox
+create_atoms	1 region simbox
+
+# ------------------------ FORCE FIELDS -----------------------
+pair_style	eam/alloy
+pair_coeff	* * Fe_m07b.eam.fs Fe
+# mass 1 56
+
+#---------------------------Settings----------------------------
+compute csym all centro/atom bcc
+compute eng all pe/atom
+compute eatoms all reduce sum c_eng
+
+
+#----------------------Run Minimization-------------------------
+min_style cg                         
+minimize 1e-15 1e-15 5000 5000
+
+variable ep equal pe
+
+print "@ ${len} ${ep}"
+
+next i
+jump in.fe1
