@@ -1,0 +1,51 @@
+# For this simple example, the molecular simulation calculates the equilibrium lattice constant and corresponding cohesive energy for aluminum
+# Find minimum energy fcc configuration
+
+# ---------- Initialize Simulation --------------------- 
+clear	# Delete all atoms, restores and memory except these command setting: shell, log, echo and variable
+units		metal 		# Metal unit system: energy is eV, distance is Å, time is ps
+dimension	3		# Three dimensional simulation
+boundary	p p p		# Periodic boundary condition in x, y and z
+atom_style	atomic		# The style of atoms
+atom_modify	map array	# Determine how atoms found when required
+
+# ---------- Create Atoms --------------------- 
+lattice 	fcc 4 				# Generate an FCC type braffi lattice
+region		box block 0 1 0 1 0 1 units lattice	# No expansion
+lattice		fcc 4 orient x 1 0 0 orient y 0 1 0 orient z 0 0 1  # No rotation performed on lattice
+create_box	1 box					# One type of simulation boxes/atoms
+create_atoms	1 box					# Create atoms in boxes with the first type of atoms defined in "pair_coeff"
+
+# ---------- Define Interatomic Potential --------------------- 
+pair_style	eam/fs 		# Style of pairwise interaction in lammps formulas
+pair_coeff	* * Al.eam.alloy Al	# Specify the pairwise force field coefficients for needed atom types
+
+neighbor	2.0 bin 		# Build pairwise neighbor lists by binning(scale linearly with one atoms each processor
+neigh_modify	every 1 delay 0 check yes # Build neighbor list every "1" steps after "0" step delay when some atom has moved half the skin distance or more
+ 
+# ---------- Define Settings --------------------- 
+compute		eng all pe/atom 		# Define the compution of potential energy for each atom performed on the group of "all"
+compute		eatoms all reduce sum c_eng	# Sum energy and reduce it into a scalar value
+thermo		10				# Compute and print thermodynamic info every 10 timesteps
+thermo_style	custom step pe lx ly lz press pxx pyy pzz c_eatoms	# Style and content in printing thermodynamic data
+
+# ---------- Run Minimization --------------------- 
+reset_timestep	0					# Set the timestep counter to 0
+fix		1 all box/relax iso 0.0 vmax 0.001	# Allow the box size(and shape) to vary to reach 0 external pressure
+min_style	cg					# Adjust atom with Polar-Ribiere version of the conjugate gradient (CG) algorithm. 
+minimize	1e-25 1e-25 5000 10000			# Adjust atom coordinates to satisfy stopping criteria of energy and pressure within certain steps respectively
+unfix		1					# Delete the fix defined as "1"
+
+# ---------- Set needed variables to print ---------------------
+variable	natoms	equal	"count(all)" 		# Counts the number of all atoms and mark it as "natoms"(value changed with calculation)
+variable	teng	equal	"c_eatoms"		# Assign the value of "eatoms" in compute definition to "teng"
+variable	length	equal	"lx"			# Assign the value of "lx" to "length" (lattice constant in equilibrium state at 0K and 0 bar)
+variable	ecoh	equal	"v_teng/v_natoms"	# Calculate the potential energy for each atom
+
+# ---------- Print the needed data to screen and log file ---------------------
+print	"Total energy (eV)	     = ${teng};"	
+print	"Number of atoms	     = ${natoms};"
+print	"Lattice constant (Angstoms) = ${length};"
+print	"Cohesive energy (eV)	     = ${ecoh};" 
+write_data	data.end	# Write the structure of the current state into a data file named as "data.xxx"
+print	"All done!"
